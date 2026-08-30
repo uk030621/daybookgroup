@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-rule dark:border-dusk-rule;
+  }
+  ::selection {
+    @apply bg-amber/40;
+  }
+  :focus-visible {
+    outline: 2px solid theme("colors.amber.DEFAULT");
+    outline-offset: 2px;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Notebook-page signature: a bound left margin with hole-punch dots,
+   used on reminder cards to evoke a page torn from a personal daybook. */
+.margin-rule {
+  position: relative;
+  padding-left: 1.75rem;
+}
+
+.margin-rule::before {
+  content: "";
+  position: absolute;
+  left: 1.15rem;
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 1px;
+  background: theme("colors.rule");
+}
+
+.dark .margin-rule::before {
+  background: theme("colors.dusk.rule");
+}
+
+.margin-rule::after {
+  content: "";
+  position: absolute;
+  left: 0.35rem;
+  top: 0.9rem;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: theme("colors.paper.dim");
+  box-shadow:
+    0 22px 0 theme("colors.paper.dim"),
+    0 44px 0 theme("colors.paper.dim"),
+    inset 0 0 0 1px theme("colors.rule");
+}
+
+.dark .margin-rule::after {
+  background: theme("colors.dusk.DEFAULT");
+  box-shadow:
+    0 22px 0 theme("colors.dusk.DEFAULT"),
+    0 44px 0 theme("colors.dusk.DEFAULT"),
+    inset 0 0 0 1px theme("colors.dusk.rule");
+}
+
+.paper-texture {
+  background-image: radial-gradient(
+    rgba(22, 48, 42, 0.035) 1px,
+    transparent 1px
+  );
+  background-size: 14px 14px;
+}
+
+.dark .paper-texture {
+  background-image: radial-gradient(
+    rgba(238, 240, 233, 0.03) 1px,
+    transparent 1px
+  );
+}
