@@ -33,6 +33,7 @@ export default function ReminderForm({
   open,
   initial,
   categories,
+  groups,
   onClose,
   onSubmit,
 }) {
@@ -45,6 +46,7 @@ export default function ReminderForm({
   const [categoryMode, setCategoryMode] = useState("select");
   const [recurrence, setRecurrence] = useState("none");
   const [remindMinutesBefore, setRemindMinutesBefore] = useState(60);
+  const [sharedWithGroupId, setSharedWithGroupId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const titleRef = useRef(null);
@@ -63,6 +65,7 @@ export default function ReminderForm({
     setCategoryMode("select");
     setRecurrence(initial?.recurrence || "none");
     setRemindMinutesBefore(initial?.remindMinutesBefore ?? 60);
+    setSharedWithGroupId(initial?.sharedWithGroupId || "");
     setError("");
     setSubmitting(false);
     setTimeout(() => titleRef.current?.focus(), 30);
@@ -98,9 +101,10 @@ export default function ReminderForm({
         category: category.trim() || "General",
         recurrence,
         remindMinutesBefore: combinedDueDate ? remindMinutesBefore : undefined,
-        timezone: combinedDueDate // ← already here
-          ? Intl.DateTimeFormat().resolvedOptions().timeZone // ← already here
-          : undefined, // ← already here
+        timezone: combinedDueDate
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : undefined,
+        sharedWithGroupId: sharedWithGroupId || null,
       });
     } catch (err) {
       setError(err.message || "Something went wrong. Try again.");
@@ -188,7 +192,7 @@ export default function ReminderForm({
                   onChange={(e) =>
                     setRemindMinutesBefore(Number(e.target.value))
                   }
-                  className="w-full min-w-0 mt-2 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-base sm:text-xs text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                  className="w-full min-w-0 mt-2 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-xs text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
                 >
                   {LEAD_TIME_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -217,7 +221,7 @@ export default function ReminderForm({
                       setCategory(e.target.value);
                     }
                   }}
-                  className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                  className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
                 >
                   {Array.from(
                     new Set(
@@ -242,7 +246,7 @@ export default function ReminderForm({
                     onChange={(e) => setCategory(e.target.value)}
                     placeholder="New category name"
                     maxLength={50}
-                    className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                    className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
                   />
                   <button
                     type="button"
@@ -289,7 +293,7 @@ export default function ReminderForm({
             <select
               value={recurrence}
               onChange={(e) => setRecurrence(e.target.value)}
-              className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+              className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
             >
               {RECURRENCES.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -298,6 +302,26 @@ export default function ReminderForm({
               ))}
             </select>
           </div>
+
+          {groups && groups.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-ink-faint dark:text-paper/50 mb-1.5">
+                Share
+              </label>
+              <select
+                value={sharedWithGroupId}
+                onChange={(e) => setSharedWithGroupId(e.target.value)}
+                className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+              >
+                <option value="">Keep private</option>
+                {groups.map((g) => (
+                  <option key={g._id} value={g._id}>
+                    Share with {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-coral-dark dark:text-coral">{error}</p>

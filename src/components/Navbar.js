@@ -1,8 +1,9 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { NotebookPen, LogOut } from "lucide-react";
+import { NotebookPen, LogOut, Users, ShieldAlert } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar({ user }) {
@@ -21,9 +22,30 @@ export default function Navbar({ user }) {
         <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
 
+          <Link
+            href="/family"
+            title="Family"
+            className="p-2 rounded-md text-ink-faint hover:text-ink dark:text-paper/60 dark:hover:text-paper hover:bg-ink/5 dark:hover:bg-paper/10 transition"
+          >
+            <Users className="w-4 h-4" />
+          </Link>
+
+          {user?.isPlatformAdmin && (
+            <Link
+              href="/admin"
+              title="Platform admin"
+              className="p-2 rounded-md text-ink-faint hover:text-amber-dark dark:text-paper/60 dark:hover:text-amber hover:bg-amber/10 transition"
+            >
+              <ShieldAlert className="w-4 h-4" />
+            </Link>
+          )}
+
           <div className="w-px h-6 bg-rule dark:bg-dusk-rule mx-1 hidden sm:block" />
 
-          <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+          >
             {user?.image ? (
               <Image
                 src={user.image}
@@ -40,7 +62,7 @@ export default function Navbar({ user }) {
             <span className="text-sm text-ink dark:text-paper hidden sm:block max-w-[9rem] truncate">
               {user?.name}
             </span>
-          </div>
+          </Link>
 
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}

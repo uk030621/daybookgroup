@@ -8,6 +8,7 @@ import {
   Repeat,
   AlertTriangle,
   Clock,
+  Users,
 } from "lucide-react";
 import { formatDueDate, isOverdue, isDueSoon } from "../lib/dateUtils";
 
@@ -105,45 +106,62 @@ export default function ReminderCard({
                   {reminder.recurrence}
                 </span>
               )}
+
+              {reminder.isOwner === false && (
+                <span
+                  className="inline-flex items-center gap-1 text-ink-faint dark:text-paper/50"
+                  title="Shared with you"
+                >
+                  <Users className="w-3 h-3" />
+                  {reminder.owner?.name || "Shared"}
+                </span>
+              )}
             </div>
           </div>
         </div>
-      </div>
 
-      <div
-        className="flex items-center gap-1 mt-3 pl-8 border-t border-rule/60 dark:border-dusk-rule/60 pt-2.5 -mb-1
-    sm:mt-0 sm:pl-0 sm:pt-0 sm:border-t-0 sm:mb-0
-    sm:absolute sm:top-2 sm:right-2
-    sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 sm:transition"
-      >
-        <button
-          onClick={() => onTogglePin(reminder)}
-          title={reminder.pinned ? "Unpin" : "Pin to top"}
-          className={`p-1.5 rounded hover:bg-ink/5 dark:hover:bg-paper/10 ${
-            reminder.pinned
-              ? "text-amber-dark dark:text-amber"
-              : "text-ink-faint dark:text-paper/50"
-          }`}
-        >
-          <Pin
-            className="w-3.5 h-3.5"
-            fill={reminder.pinned ? "currentColor" : "none"}
-          />
-        </button>
-        <button
-          onClick={() => onEdit(reminder)}
-          title="Edit"
-          className="p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-ink/5 dark:hover:bg-paper/10 hover:text-ink dark:hover:text-paper"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={() => onDelete(reminder)}
-          title="Delete"
-          className="p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-coral/10 hover:text-coral-dark dark:hover:text-coral"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+        {/* Actions: a normal-flow row on mobile (always visible, tappable),
+           promoted to a hover-revealed overlay in the card's top-right corner
+           from `sm` up, where hover exists and there's room to spare.
+           Only the owner sees these — a shared reminder can only be toggled
+           complete by anyone else, not pinned, edited, or deleted. */}
+        {reminder.isOwner !== false && (
+          <div
+            className="flex items-center gap-1 mt-3 pl-8 border-t border-rule/60 dark:border-dusk-rule/60 pt-2.5 -mb-1
+              sm:mt-0 sm:pl-0 sm:pt-0 sm:border-t-0 sm:mb-0
+              sm:absolute sm:top-2 sm:right-2
+              sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 sm:transition"
+          >
+            <button
+              onClick={() => onTogglePin(reminder)}
+              title={reminder.pinned ? "Unpin" : "Pin to top"}
+              className={`p-1.5 rounded hover:bg-ink/5 dark:hover:bg-paper/10 ${
+                reminder.pinned
+                  ? "text-amber-dark dark:text-amber"
+                  : "text-ink-faint dark:text-paper/50"
+              }`}
+            >
+              <Pin
+                className="w-3.5 h-3.5"
+                fill={reminder.pinned ? "currentColor" : "none"}
+              />
+            </button>
+            <button
+              onClick={() => onEdit(reminder)}
+              title="Edit"
+              className="p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-ink/5 dark:hover:bg-paper/10 hover:text-ink dark:hover:text-paper"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(reminder)}
+              title="Delete"
+              className="p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-coral/10 hover:text-coral-dark dark:hover:text-coral"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

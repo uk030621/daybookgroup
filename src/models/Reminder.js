@@ -58,6 +58,15 @@ const ReminderSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    // Set to a Group's _id to make this reminder visible to every active
+    // member of that group. Null (the default) means fully private — only
+    // the owner can see it. A reminder can be shared with at most one group.
+    sharedWithGroupId: {
+      type: Schema.Types.ObjectId,
+      ref: "Group",
+      default: null,
+      index: true,
+    },
     recurrence: {
       type: String,
       enum: ["none", "daily", "weekly", "monthly"],

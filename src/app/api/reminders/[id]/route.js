@@ -2,9 +2,31 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../lib/auth";
 import { connectToDatabase } from "../../../../lib/mongodb";
 import Reminder from "../../../../models/Reminder";
+import Membership from "../../../../models/Membership";
+import { getActiveMembership } from "../../../../lib/permissions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+// A reminder is visible to its owner, or to any active member of the group
+// it's shared with.
+async function findVisibleReminder(id, userId) {
+  const reminder = await Reminder.findById(id);
+  if (!reminder) return null;
+
+  if (reminder.userId === userId) return reminder;
+
+  if (reminder.sharedWithGroupId) {
+    const membership = await getActiveMembership(
+      Membership,
+      reminder.sharedWithGroupId,
+      userId,
+    );
+    if (membership) return reminder;
+  }
+
+  return null;
+}
 
 // GET /api/reminders/:id
 export async function GET(request, { params }) {
@@ -17,11 +39,7 @@ export async function GET(request, { params }) {
 
   await connectToDatabase();
 
-  const reminder = await Reminder.findOne({
-    _id: id,
-    userId: session.user.id,
-  }).lean();
-
+  const reminder = await findVisibleReminder(id, session.user.id);
   if (!reminder) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -30,6 +48,12 @@ export async function GET(request, { params }) {
 }
 
 // PUT /api/reminders/:id
+//
+// The owner can change anything. A non-owner who's an active member of the
+// group this reminder is shared with can ONLY toggle `completed` — every
+// other field in the request body is silently ignored for them, not just
+// rejected, since a shared "mark as done" click shouldn't fail outright
+// just because the client happens to send other unchanged fields too.
 export async function PUT(request, { params }) {
   const { id } = await params;
 
@@ -42,12 +66,47 @@ export async function PUT(request, { params }) {
 
   await connectToDatabase();
 
+  const existing = await Reminder.findById(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const isOwner = existing.userId === session.user.id;
+
+  if (!isOwner) {
+    let canToggle = false;
+    if (existing.sharedWithGroupId) {
+      const membership = await getActiveMembership(
+        Membership,
+        existing.sharedWithGroupId,
+        session.user.id,
+      );
+      canToggle = Boolean(membership);
+    }
+    if (!canToggle) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (body.completed === undefined) {
+      return NextResponse.json(
+        { error: "You can only mark this reminder complete or active" },
+        { status: 403 },
+      );
+    }
+
+    existing.completed = !!body.completed;
+    existing.completedAt = body.completed ? new Date() : null;
+    await existing.save();
+    return NextResponse.json({ reminder: existing.toObject() });
+  }
+
+  // Owner — full edit access.
   const update = {};
   if (body.title !== undefined) update.title = body.title.trim();
   if (body.notes !== undefined) update.notes = body.notes.trim();
   if (body.dueDate !== undefined)
     update.dueDate = body.dueDate ? new Date(body.dueDate) : null;
-  if (body.timezone !== undefined) update.timezone = body.timezone || null; // ← already here
+  if (body.timezone !== undefined) update.timezone = body.timezone || null;
   if (body.priority !== undefined) update.priority = body.priority;
   if (body.category !== undefined)
     update.category = body.category.trim() || "General";
@@ -60,6 +119,24 @@ export async function PUT(request, { params }) {
   if (body.completed !== undefined) {
     update.completed = !!body.completed;
     update.completedAt = body.completed ? new Date() : null;
+  }
+  if (body.sharedWithGroupId !== undefined) {
+    if (body.sharedWithGroupId) {
+      const membership = await getActiveMembership(
+        Membership,
+        body.sharedWithGroupId,
+        session.user.id,
+      );
+      if (!membership) {
+        return NextResponse.json(
+          { error: "You can only share with a group you belong to" },
+          { status: 403 },
+        );
+      }
+      update.sharedWithGroupId = body.sharedWithGroupId;
+    } else {
+      update.sharedWithGroupId = null;
+    }
   }
 
   // A reminder's due date or lead time changing means any previously-sent
@@ -82,7 +159,8 @@ export async function PUT(request, { params }) {
   return NextResponse.json({ reminder });
 }
 
-// DELETE /api/reminders/:id
+// DELETE /api/reminders/:id — owner only. A shared reminder can't be
+// deleted by anyone other than the person who created it.
 export async function DELETE(request, { params }) {
   const { id } = await params;
 

@@ -22,6 +22,7 @@ function advanceRecurrence(dateString, recurrence) {
 export default function Dashboard({ user }) {
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("active");
   const [category, setCategory] = useState("all");
@@ -54,18 +55,26 @@ export default function Dashboard({ user }) {
     loadReminders();
   }, [loadReminders]);
 
+  useEffect(() => {
+    fetch("/api/groups", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { groups: [] }))
+      .then((data) => setGroups(data.groups || []))
+      .catch(() => setGroups([]));
+  }, []);
+
   const categories = useMemo(() => {
     const set = new Set(reminders.map((r) => r.category || "General"));
     return Array.from(set).sort();
   }, [reminders]);
 
   const counts = useMemo(() => {
-    const active = reminders.filter((r) => !r.completed).length;
-    const completed = reminders.filter((r) => r.completed).length;
-    const overdue = reminders.filter((r) =>
+    const mine = reminders.filter((r) => r.isOwner !== false);
+    const active = mine.filter((r) => !r.completed).length;
+    const completed = mine.filter((r) => r.completed).length;
+    const overdue = mine.filter((r) =>
       isOverdue(r.dueDate, r.completed),
     ).length;
-    const dueSoon = reminders.filter((r) =>
+    const dueSoon = mine.filter((r) =>
       isDueSoon(r.dueDate, r.completed),
     ).length;
     return { active, completed, overdue, dueSoon };
@@ -118,6 +127,7 @@ export default function Dashboard({ user }) {
   }
 
   function openEdit(reminder) {
+    if (reminder.isOwner === false) return;
     setEditing(reminder);
     setFormOpen(true);
   }
@@ -168,7 +178,14 @@ export default function Dashboard({ user }) {
     );
 
     // Spin off the next occurrence of a recurring reminder when completed.
-    if (completing && reminder.recurrence !== "none") {
+    // Only the owner's completion advances the series — a group member
+    // marking a shared reminder done shouldn't create a new one under the
+    // owner's account.
+    if (
+      completing &&
+      reminder.recurrence !== "none" &&
+      reminder.isOwner !== false
+    ) {
       const nextDueDate = advanceRecurrence(
         reminder.dueDate,
         reminder.recurrence,
@@ -184,7 +201,8 @@ export default function Dashboard({ user }) {
           category: reminder.category,
           recurrence: reminder.recurrence,
           remindMinutesBefore: reminder.remindMinutesBefore,
-          timezone: reminder.timezone, // ← already here
+          timezone: reminder.timezone,
+          sharedWithGroupId: reminder.sharedWithGroupId,
         }),
       });
       if (createRes.ok) {
@@ -273,6 +291,7 @@ export default function Dashboard({ user }) {
         open={formOpen}
         initial={editing}
         categories={categories}
+        groups={groups}
         onClose={() => {
           setFormOpen(false);
           setEditing(null);

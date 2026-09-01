@@ -12,3 +12,13 @@ export function isPlatformAdmin(email) {
 
   return admins.includes(email.toLowerCase());
 }
+
+// Returns the caller's active membership row for a group, or null if
+// they're not an active member (pending invites don't count).
+export async function getActiveMembership(Membership, groupId, userId) {
+  return Membership.findOne({ groupId, userId, status: "active" }).lean();
+}
+
+export function isGroupAdmin(membership) {
+  return membership?.status === "active" && membership?.role === "admin";
+}

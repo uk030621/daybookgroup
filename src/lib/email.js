@@ -25,7 +25,7 @@ function formatDue(date, timezone) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZoneName: "long", // ← changed from "short" to "long"
+    timeZoneName: "long",
     // Falling back to UTC only happens for reminders created before this
     // field existed, or if a browser ever fails to report its timezone.
     timeZone: timezone || "UTC",
@@ -39,7 +39,7 @@ export async function sendReminderEmail(reminder) {
     process.env.EMAIL_FROM || "Daybook <onboarding@resend.dev>";
 
   const dueText = reminder.dueDate
-    ? formatDue(reminder.dueDate, reminder.timezone) // ← already passing timezone
+    ? formatDue(reminder.dueDate, reminder.timezone)
     : null;
 
   const html = `
@@ -87,4 +87,43 @@ function escapeHtml(str) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+export async function sendGroupInviteEmail({
+  toEmail,
+  groupName,
+  inviterName,
+  acceptUrl,
+}) {
+  const resend = getResendClient();
+  const fromAddress =
+    process.env.EMAIL_FROM || "Daybook <onboarding@resend.dev>";
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; color: #16302A;">
+      <p style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #5C6F67; margin: 0 0 8px;">
+        Daybook invite
+      </p>
+      <h1 style="font-size: 22px; margin: 0 0 12px; color: #16302A;">
+        ${escapeHtml(inviterName || "Someone")} invited you to ${escapeHtml(groupName)}
+      </h1>
+      <p style="font-size: 14px; line-height: 1.5; color: #2B463D; margin: 0 0 20px;">
+        Accept below to join, using the same Google account you'd like to use with Daybook.
+      </p>
+      <a href="${acceptUrl}" style="display: inline-block; background: #16302A; color: #EEF0E9; text-decoration: none; padding: 10px 18px; border-radius: 6px; font-size: 14px;">Accept invite</a>
+    </div>
+  `;
+
+  const text = [
+    `${inviterName || "Someone"} invited you to ${groupName} on Daybook.`,
+    `Accept here: ${acceptUrl}`,
+  ].join("\n\n");
+
+  return resend.emails.send({
+    from: fromAddress,
+    to: toEmail,
+    subject: `You've been invited to ${groupName} on Daybook`,
+    html,
+    text,
+  });
 }

@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { NotebookPen } from "lucide-react";
 
-export default function SignInCard() {
+export default function SignInCard({ callbackUrl = "/" }) {
   return (
     <div className="w-full max-w-sm animate-fadeUp">
       <div className="flex flex-col items-center text-center mb-8">
@@ -14,14 +14,13 @@ export default function SignInCard() {
           Daybook
         </h1>
         <p className="text-ink-faint dark:text-paper/60 mt-2 text-sm max-w-[26ch]">
-          A quiet place to keep track of what matters today, and what's
-          coming.
+          A quiet place to keep track of what matters today, and what's coming.
         </p>
       </div>
 
       <div className="bg-white/60 dark:bg-dusk-card/60 border border-rule dark:border-dusk-rule rounded-card p-6 shadow-card">
         <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={() => signIn("google", { callbackUrl })}
           className="w-full flex items-center justify-center gap-3 bg-ink dark:bg-paper text-paper dark:text-ink font-medium rounded-md py-3 px-4 hover:opacity-90 active:scale-[0.99] transition"
         >
           <GoogleMark />
