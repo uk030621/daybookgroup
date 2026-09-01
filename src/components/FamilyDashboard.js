@@ -37,7 +37,7 @@ export default function FamilyDashboard() {
         setSelectedGroupId(data.groups[0]._id);
       }
     } catch {
-      setError("Couldn't load your family groups.");
+      setError("Couldn't load your groups.");
     } finally {
       setLoadingGroups(false);
     }
@@ -140,10 +140,10 @@ export default function FamilyDashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl sm:text-3xl italic text-ink dark:text-paper">
-          Family
+          Inner Circle
         </h1>
         <p className="text-sm text-ink-faint dark:text-paper/50 mt-1">
-          Manage who's in your family group.
+          Manage who's in your Inner Circle group.
         </p>
       </div>
 
@@ -181,7 +181,7 @@ export default function FamilyDashboard() {
           value={newGroupName}
           onChange={(e) => setNewGroupName(e.target.value)}
           placeholder={
-            groups.length ? "Start another group…" : "e.g. The Morgan Family"
+            groups.length ? "Start another group…" : "e.g. Enter a Group Name"
           }
           maxLength={100}
           className="flex-1 min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
@@ -201,7 +201,7 @@ export default function FamilyDashboard() {
 
       {!loadingGroups && groups.length === 0 && (
         <p className="text-sm text-ink-faint dark:text-paper/50">
-          You're not part of a family group yet — create one above.
+          You're not part of a group yet — create one above.
         </p>
       )}
 

@@ -36,7 +36,7 @@ export default function AdminDashboard() {
           Platform overview
         </h1>
         <p className="text-sm text-ink-faint dark:text-paper/50 mt-1">
-          Read-only. Across every family group, everyone.
+          Read-only. Across every group, everyone.
         </p>
       </div>
 
