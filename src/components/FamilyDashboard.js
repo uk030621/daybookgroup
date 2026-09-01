@@ -184,7 +184,7 @@ export default function FamilyDashboard() {
             groups.length ? "Start another group…" : "e.g. The Morgan Family"
           }
           maxLength={100}
-          className="flex-1 min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+          className="flex-1 min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
         />
         <button
           type="submit"
@@ -269,7 +269,7 @@ export default function FamilyDashboard() {
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="Invite by email"
-                    className="flex-1 min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                    className="flex-1 min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
                   />
                   <button
                     type="submit"
