@@ -37,10 +37,12 @@ const MembershipSchema = new Schema(
       type: String,
       required: true,
     },
-    // Random token embedded in the invite link. Cleared once accepted.
+    // Random token embedded in the invite link. Cleared (unset entirely,
+    // not set to null) once accepted — the sparse unique index below only
+    // excludes documents where this field is genuinely absent, not ones
+    // where it's explicitly null, so it must never be given a default.
     inviteToken: {
       type: String,
-      default: null,
     },
     joinedAt: {
       type: Date,
