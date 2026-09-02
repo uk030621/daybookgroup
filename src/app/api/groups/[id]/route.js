@@ -4,7 +4,8 @@ import { connectToDatabase } from "../../../../lib/mongodb";
 import Group from "../../../../models/Group";
 import Membership from "../../../../models/Membership";
 import User from "../../../../models/User";
-import { getActiveMembership } from "../../../../lib/permissions";
+import Reminder from "../../../../models/Reminder";
+import { getActiveMembership, isGroupAdmin } from "../../../../lib/permissions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -65,4 +66,85 @@ export async function GET(request, { params }) {
     myRole: myMembership.role,
     members,
   });
+}
+
+// PATCH /api/groups/:id — admin-only. Body: { name }
+export async function PATCH(request, { params }) {
+  const { id } = await params;
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const name = body.name?.trim();
+  if (!name) {
+    return NextResponse.json(
+      { error: "Group name is required" },
+      { status: 400 },
+    );
+  }
+
+  await connectToDatabase();
+
+  const myMembership = await getActiveMembership(
+    Membership,
+    id,
+    session.user.id,
+  );
+  if (!isGroupAdmin(myMembership)) {
+    return NextResponse.json(
+      { error: "Only a group admin can rename this group" },
+      { status: 403 },
+    );
+  }
+
+  const group = await Group.findByIdAndUpdate(
+    id,
+    { name },
+    { new: true, runValidators: true },
+  ).lean();
+
+  if (!group) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ group });
+}
+
+// DELETE /api/groups/:id — admin-only. Deletes the group and every
+// membership in it. Reminders that were shared with this group are NOT
+// deleted — they're simply unshared (reverted to private), since a group
+// disappearing shouldn't take someone's own reminder down with it.
+export async function DELETE(request, { params }) {
+  const { id } = await params;
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  await connectToDatabase();
+
+  const myMembership = await getActiveMembership(
+    Membership,
+    id,
+    session.user.id,
+  );
+  if (!isGroupAdmin(myMembership)) {
+    return NextResponse.json(
+      { error: "Only a group admin can delete this group" },
+      { status: 403 },
+    );
+  }
+
+  await Reminder.updateMany(
+    { sharedWithGroupId: id },
+    { $set: { sharedWithGroupId: null } },
+  );
+  await Membership.deleteMany({ groupId: id });
+  await Group.findByIdAndDelete(id);
+
+  return NextResponse.json({ success: true });
 }

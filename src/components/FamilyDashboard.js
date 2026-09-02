@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { UserPlus, Trash2, Shield, Mail } from "lucide-react";
+import { UserPlus, Trash2, Shield, Mail, Pencil, Check, X } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
 import Toast from "./Toast";
 
@@ -19,6 +19,10 @@ export default function FamilyDashboard() {
   const [inviting, setInviting] = useState(false);
 
   const [pendingRemoval, setPendingRemoval] = useState(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [pendingGroupDelete, setPendingGroupDelete] = useState(false);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
 
@@ -134,16 +138,64 @@ export default function FamilyDashboard() {
     }
   }
 
+  function startRename() {
+    setNameDraft(detail.group.name);
+    setEditingName(true);
+  }
+
+  async function saveRename() {
+    const name = nameDraft.trim();
+    if (!name) return;
+    setSavingName(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/groups/${selectedGroupId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't rename this group.");
+      setDetail((prev) => ({ ...prev, group: { ...prev.group, name } }));
+      setGroups((prev) =>
+        prev.map((g) => (g._id === selectedGroupId ? { ...g, name } : g)),
+      );
+      setEditingName(false);
+      showToast("Renamed");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  async function confirmGroupDelete() {
+    setPendingGroupDelete(false);
+    const deletedId = selectedGroupId;
+    try {
+      const res = await fetch(`/api/groups/${deletedId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't delete this group.");
+      const remaining = groups.filter((g) => g._id !== deletedId);
+      setGroups(remaining);
+      setDetail(null);
+      setSelectedGroupId(remaining[0]?._id || null);
+      showToast("Group deleted");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   const isAdmin = detail?.myRole === "admin";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl sm:text-3xl italic text-ink dark:text-paper">
-          Inner Circle
+          Group Setup
         </h1>
         <p className="text-sm text-ink-faint dark:text-paper/50 mt-1">
-          Manage who's in your Inner Circle group.
+          Give your group a name & manage who's in it.
         </p>
       </div>
 
@@ -181,7 +233,7 @@ export default function FamilyDashboard() {
           value={newGroupName}
           onChange={(e) => setNewGroupName(e.target.value)}
           placeholder={
-            groups.length ? "Start another group…" : "e.g. Enter a Group Name"
+            groups.length ? "Start another group…" : "e.g. The Morgan Family"
           }
           maxLength={100}
           className="flex-1 min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
@@ -201,7 +253,7 @@ export default function FamilyDashboard() {
 
       {!loadingGroups && groups.length === 0 && (
         <p className="text-sm text-ink-faint dark:text-paper/50">
-          You're not part of a group yet — create one above.
+          You're not part of a selected group yet — create one above.
         </p>
       )}
 
@@ -215,12 +267,54 @@ export default function FamilyDashboard() {
 
           {!loadingDetail && detail && (
             <>
-              <div className="flex items-center justify-between">
-                <h2 className="font-display text-lg italic text-ink dark:text-paper">
-                  {detail.group.name}
-                </h2>
+              <div className="flex items-center justify-between gap-2">
+                {editingName ? (
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <input
+                      autoFocus
+                      value={nameDraft}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      maxLength={100}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveRename();
+                        if (e.key === "Escape") setEditingName(false);
+                      }}
+                      className="flex-1 min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-2.5 py-1.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                    />
+                    <button
+                      onClick={saveRename}
+                      disabled={savingName || !nameDraft.trim()}
+                      title="Save"
+                      className="shrink-0 p-1.5 rounded text-sage-dark dark:text-sage hover:bg-sage/10 disabled:opacity-50"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setEditingName(false)}
+                      title="Cancel"
+                      className="shrink-0 p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-ink/5 dark:hover:bg-paper/10"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <h2 className="font-display text-lg italic text-ink dark:text-paper truncate">
+                      {detail.group.name}
+                    </h2>
+                    {isAdmin && (
+                      <button
+                        onClick={startRename}
+                        title="Rename group"
+                        className="shrink-0 p-1 rounded text-ink-faint dark:text-paper/50 hover:bg-ink/5 dark:hover:bg-paper/10 hover:text-ink dark:hover:text-paper"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
                 {isAdmin && (
-                  <span className="inline-flex items-center gap-1 text-xs text-amber-dark dark:text-amber">
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-dark dark:text-amber shrink-0">
                     <Shield className="w-3.5 h-3.5" /> You're an admin
                   </span>
                 )}
@@ -281,6 +375,18 @@ export default function FamilyDashboard() {
                   </button>
                 </form>
               )}
+
+              {isAdmin && (
+                <div className="pt-3 mt-1 border-t border-rule/60 dark:border-dusk-rule/60">
+                  <button
+                    onClick={() => setPendingGroupDelete(true)}
+                    className="inline-flex items-center gap-1.5 text-sm text-coral-dark dark:text-coral hover:bg-coral/10 rounded-md px-2 py-1.5 -ml-2 transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete this group
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -296,6 +402,20 @@ export default function FamilyDashboard() {
         }
         onConfirm={confirmRemoval}
         onCancel={() => setPendingRemoval(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingGroupDelete}
+        title="Delete this group?"
+        description={
+          detail
+            ? `"${detail.group.name}" and all ${detail.members.length} member${
+                detail.members.length === 1 ? "" : "s"
+              } will be removed. Reminders shared with this group will become private again, not deleted.`
+            : ""
+        }
+        onConfirm={confirmGroupDelete}
+        onCancel={() => setPendingGroupDelete(false)}
       />
 
       <Toast message={toast} />
