@@ -64,6 +64,7 @@ export async function GET(request, { params }) {
   return NextResponse.json({
     group,
     myRole: myMembership.role,
+    pushMuted: Boolean(myMembership.pushMuted),
     members,
   });
 }

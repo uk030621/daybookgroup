@@ -120,6 +120,9 @@ export async function PUT(request, { params }) {
     update.completed = !!body.completed;
     update.completedAt = body.completed ? new Date() : null;
   }
+  if (body.pushEnabled !== undefined) update.pushEnabled = !!body.pushEnabled;
+  if (body.pushNotifyGroup !== undefined)
+    update.pushNotifyGroup = !!body.pushNotifyGroup;
   if (body.sharedWithGroupId !== undefined) {
     if (body.sharedWithGroupId) {
       const membership = await getActiveMembership(
@@ -139,11 +142,38 @@ export async function PUT(request, { params }) {
     }
   }
 
+  // Group pushes only make sense for a shared reminder: unsharing (or
+  // switching push off entirely) also switches them off.
+  const willBeShared =
+    update.sharedWithGroupId !== undefined
+      ? Boolean(update.sharedWithGroupId)
+      : Boolean(existing.sharedWithGroupId);
+  const willPush =
+    update.pushEnabled !== undefined
+      ? update.pushEnabled
+      : existing.pushEnabled !== false;
+  if (!willBeShared || !willPush) {
+    update.pushNotifyGroup = false;
+  }
+
   // A reminder's due date or lead time changing means any previously-sent
   // lead-time email was for the wrong moment — clear it so the cron job
   // sends a fresh one at the new time.
   if (body.dueDate !== undefined || body.remindMinutesBefore !== undefined) {
     update.reminderEmailSentAt = null;
+  }
+
+  // The push is re-armed only when the moment it should fire has really
+  // moved — editing a title or notes must not buzz anyone's phone twice.
+  const dueChanged =
+    update.dueDate !== undefined &&
+    (update.dueDate?.getTime() ?? null) !==
+      (existing.dueDate ? new Date(existing.dueDate).getTime() : null);
+  const leadChanged =
+    update.remindMinutesBefore !== undefined &&
+    update.remindMinutesBefore !== (existing.remindMinutesBefore ?? 60);
+  if (dueChanged || leadChanged) {
+    update.pushSentAt = null;
   }
 
   const reminder = await Reminder.findOneAndUpdate(

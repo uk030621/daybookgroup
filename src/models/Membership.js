@@ -48,6 +48,12 @@ const MembershipSchema = new Schema(
       type: Date,
       default: null,
     },
+    // A member can silence push notifications for reminders other people
+    // share with this group, without leaving the group.
+    pushMuted: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

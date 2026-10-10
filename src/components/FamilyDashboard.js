@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { UserPlus, Trash2, Shield, Mail, Pencil, Check, X } from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
 import Toast from "./Toast";
+import SwitchRow from "./SwitchRow";
 
 export default function FamilyDashboard() {
   const [groups, setGroups] = useState([]);
@@ -186,6 +187,25 @@ export default function FamilyDashboard() {
     }
   }
 
+  async function handleMuteChange(muted) {
+    const previous = detail.pushMuted;
+    setDetail((prev) => ({ ...prev, pushMuted: muted }));
+    setError("");
+    try {
+      const res = await fetch(`/api/groups/${selectedGroupId}/mute`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muted }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't save that setting.");
+      showToast(muted ? "Group notifications muted" : "Group notifications on");
+    } catch (err) {
+      setDetail((prev) => ({ ...prev, pushMuted: previous }));
+      setError(err.message);
+    }
+  }
+
   const isAdmin = detail?.myRole === "admin";
 
   return (
@@ -355,6 +375,15 @@ export default function FamilyDashboard() {
                   </li>
                 ))}
               </ul>
+
+              <div className="rounded-md border border-rule dark:border-dusk-rule bg-white/40 dark:bg-dusk/40">
+                <SwitchRow
+                  label="Mute push notifications from this group"
+                  description="You'll still see shared reminders in Daybook, and can stay in the group. Your own reminders are unaffected."
+                  checked={Boolean(detail.pushMuted)}
+                  onChange={handleMuteChange}
+                />
+              </div>
 
               {isAdmin && (
                 <form onSubmit={handleInvite} className="flex gap-2 pt-2">

@@ -149,6 +149,10 @@ export async function POST(request) {
     pinned: !!body.pinned,
     remindMinutesBefore,
     reminderEmailSentAt: null,
+    pushEnabled: body.pushEnabled === undefined ? true : !!body.pushEnabled,
+    // Only meaningful (and only kept) while the reminder is shared.
+    pushNotifyGroup: Boolean(sharedWithGroupId) && !!body.pushNotifyGroup,
+    pushSentAt: null,
     sharedWithGroupId,
   });
 

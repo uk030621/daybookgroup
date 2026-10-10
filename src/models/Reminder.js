@@ -85,6 +85,27 @@ const ReminderSchema = new Schema(
       type: Date,
       default: null,
     },
+    // Whether to send a push notification at the same lead time as the
+    // email. On by default; reminders saved before this field existed have
+    // no value and are treated as on.
+    pushEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    // Only meaningful when the reminder is shared with a group: also push
+    // to the other active members of that group. Off by default, so sharing
+    // a reminder never starts notifying the whole family unless the owner
+    // chose it.
+    pushNotifyGroup: {
+      type: Boolean,
+      default: false,
+    },
+    // Set once the lead-time push has been delivered, so it is never sent
+    // twice. Cleared when dueDate or remindMinutesBefore genuinely changes.
+    pushSentAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

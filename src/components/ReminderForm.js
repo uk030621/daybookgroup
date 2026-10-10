@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import SwitchRow from "./SwitchRow";
 
 const PRIORITIES = ["low", "medium", "high"];
 const RECURRENCES = [
@@ -46,6 +47,8 @@ export default function ReminderForm({
   const [categoryMode, setCategoryMode] = useState("select");
   const [recurrence, setRecurrence] = useState("none");
   const [remindMinutesBefore, setRemindMinutesBefore] = useState(60);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [pushNotifyGroup, setPushNotifyGroup] = useState(false);
   const [sharedWithGroupId, setSharedWithGroupId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -65,6 +68,8 @@ export default function ReminderForm({
     setCategoryMode("select");
     setRecurrence(initial?.recurrence || "none");
     setRemindMinutesBefore(initial?.remindMinutesBefore ?? 60);
+    setPushEnabled(initial?.pushEnabled !== false);
+    setPushNotifyGroup(Boolean(initial?.pushNotifyGroup));
     setSharedWithGroupId(initial?.sharedWithGroupId || "");
     setError("");
     setSubmitting(false);
@@ -101,6 +106,8 @@ export default function ReminderForm({
         category: category.trim() || "General",
         recurrence,
         remindMinutesBefore: combinedDueDate ? remindMinutesBefore : undefined,
+        pushEnabled,
+        pushNotifyGroup: Boolean(sharedWithGroupId) && pushEnabled && pushNotifyGroup,
         timezone: combinedDueDate
           ? Intl.DateTimeFormat().resolvedOptions().timeZone
           : undefined,
@@ -192,11 +199,11 @@ export default function ReminderForm({
                   onChange={(e) =>
                     setRemindMinutesBefore(Number(e.target.value))
                   }
-                  className="w-full min-w-0 mt-2 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-xs text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                  className="w-full min-w-0 mt-2 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2 text-base sm:text-xs text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
                 >
                   {LEAD_TIME_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
-                      Email me {opt.label.toLowerCase()}
+                      Remind me {opt.label.toLowerCase()}
                     </option>
                   ))}
                 </select>
@@ -221,7 +228,7 @@ export default function ReminderForm({
                       setCategory(e.target.value);
                     }
                   }}
-                  className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                  className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
                 >
                   {Array.from(
                     new Set(
@@ -246,7 +253,7 @@ export default function ReminderForm({
                     onChange={(e) => setCategory(e.target.value)}
                     placeholder="New category name"
                     maxLength={50}
-                    className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                    className="w-full min-w-0 bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
                   />
                   <button
                     type="button"
@@ -293,7 +300,7 @@ export default function ReminderForm({
             <select
               value={recurrence}
               onChange={(e) => setRecurrence(e.target.value)}
-              className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+              className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
             >
               {RECURRENCES.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -311,7 +318,7 @@ export default function ReminderForm({
               <select
                 value={sharedWithGroupId}
                 onChange={(e) => setSharedWithGroupId(e.target.value)}
-                className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
+                className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
               >
                 <option value="">Keep private</option>
                 {groups.map((g) => (
@@ -320,6 +327,25 @@ export default function ReminderForm({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {dueDatePart && (
+            <div className="rounded-md border border-rule dark:border-dusk-rule bg-white/40 dark:bg-dusk/40 divide-y divide-rule dark:divide-dusk-rule">
+              <SwitchRow
+                label="Push notification"
+                description="Also notify my devices at the reminder time"
+                checked={pushEnabled}
+                onChange={setPushEnabled}
+              />
+              {sharedWithGroupId && pushEnabled && (
+                <SwitchRow
+                  label="Notify group members too"
+                  description="Everyone in the group who has notifications on gets a push"
+                  checked={pushNotifyGroup}
+                  onChange={setPushNotifyGroup}
+                />
+              )}
             </div>
           )}
 

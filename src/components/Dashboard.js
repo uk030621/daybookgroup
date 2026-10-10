@@ -202,6 +202,8 @@ export default function Dashboard({ user }) {
           recurrence: reminder.recurrence,
           remindMinutesBefore: reminder.remindMinutesBefore,
           timezone: reminder.timezone,
+          pushEnabled: reminder.pushEnabled !== false,
+          pushNotifyGroup: !!reminder.pushNotifyGroup,
           sharedWithGroupId: reminder.sharedWithGroupId,
         }),
       });
