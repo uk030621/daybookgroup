@@ -18,6 +18,7 @@ export default function PushToggle() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [otherDevices, setOtherDevices] = useState([]);
   const wrapperRef = useRef(null);
 
   // Work out the starting state, and re-sync an existing subscription to the
@@ -78,6 +79,53 @@ export default function PushToggle() {
       window.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // The signed-in person's other notification devices (a second phone, a
+  // laptop), so one that's been lost or handed on can be removed from here.
+  const loadDevices = useCallback(async () => {
+    try {
+      const subscription = await getCurrentSubscription().catch(() => null);
+      const res = await fetch("/api/push/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: subscription?.endpoint || null }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setOtherDevices((data.devices || []).filter((d) => !d.current));
+    } catch {
+      // The list is a convenience — leave it as it was.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && (status === "on" || status === "off")) loadDevices();
+  }, [open, status, loadDevices]);
+
+  const removeDevice = useCallback(
+    async (id) => {
+      setBusy(true);
+      setMessage("");
+      try {
+        const res = await fetch("/api/push/devices", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        setMessage(
+          res.ok
+            ? "That device will no longer get your reminders."
+            : "Couldn't remove that device. Please try again.",
+        );
+        await loadDevices();
+      } catch {
+        setMessage("Couldn't remove that device. Please try again.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [loadDevices],
+  );
 
   const enable = useCallback(async () => {
     setBusy(true);
@@ -156,7 +204,7 @@ export default function PushToggle() {
         await fetch("/api/push/subscribe", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
+          body: JSON.stringify({ endpoint: subscription.endpoint, reason: "turned off in the bell menu" }),
         }).catch(() => {});
         await subscription.unsubscribe();
       }
@@ -264,7 +312,9 @@ export default function PushToggle() {
           {status === "on" && (
             <>
               <p className="text-sm text-ink-faint dark:text-paper/60">
-                Notifications are on for this device.
+                Notifications are on for this device, and stay on if you
+                sign out. Before handing this device to someone else, tap{" "}
+                <strong>Turn off</strong>.
               </p>
               <div className="flex gap-2">
                 <button
@@ -285,6 +335,45 @@ export default function PushToggle() {
                 </button>
               </div>
             </>
+          )}
+
+          {(status === "on" || status === "off") && otherDevices.length > 0 && (
+            <div className="pt-3 border-t border-rule dark:border-dusk-rule space-y-2">
+              <h3 className="text-sm font-medium text-ink dark:text-paper">
+                Your other devices
+              </h3>
+              <ul className="space-y-2">
+                {otherDevices.map((device) => (
+                  <li
+                    key={device.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm text-ink dark:text-paper truncate">
+                        {device.label}
+                      </p>
+                      <p className="text-xs text-ink-faint dark:text-paper/60">
+                        Added{" "}
+                        {new Date(device.addedAt).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeDevice(device.id)}
+                      disabled={busy}
+                      aria-label={`Remove ${device.label}`}
+                      className="shrink-0 px-3 py-1.5 rounded-md border border-rule dark:border-dusk-rule text-sm text-coral-dark dark:text-coral hover:bg-coral/10 disabled:opacity-60 transition"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {message && (

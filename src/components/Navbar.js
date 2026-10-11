@@ -6,7 +6,6 @@ import Image from "next/image";
 import Link from "next/link";
 import ThemeToggle from "./ThemeToggle";
 import PushToggle from "./PushToggle";
-import { forgetThisDeviceOnServer } from "../lib/pushClient";
 
 export default function Navbar({ user }) {
   return (
@@ -69,10 +68,7 @@ export default function Navbar({ user }) {
           </Link>
 
           <button
-            onClick={async () => {
-              await forgetThisDeviceOnServer();
-              signOut({ callbackUrl: "/login" });
-            }}
+            onClick={() => signOut({ callbackUrl: "/login" })}
             title="Sign out"
             className="p-2 rounded-md text-ink-faint hover:text-coral dark:text-paper/60 dark:hover:text-coral hover:bg-coral/10 transition"
           >

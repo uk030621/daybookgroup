@@ -88,6 +88,9 @@ export async function DELETE(request) {
   }
 
   await connectToDatabase();
+  console.log(
+    `[push] device removed by request: ${String(body.reason || "no reason given").slice(0, 60)}`,
+  );
   await PushSubscription.deleteOne({
     endpoint: body.endpoint,
     userId: session.user.id,

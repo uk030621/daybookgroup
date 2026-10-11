@@ -45,21 +45,3 @@ export async function getCurrentSubscription() {
   const registration = await navigator.serviceWorker.ready;
   return registration.pushManager.getSubscription();
 }
-
-// Called when someone signs out, so this device stops receiving their
-// notifications. Best effort — never blocks sign-out.
-export async function forgetThisDeviceOnServer() {
-  try {
-    if (!pushIsSupported()) return;
-    const registration = await navigator.serviceWorker.getRegistration("/");
-    const subscription = await registration?.pushManager.getSubscription();
-    if (!subscription) return;
-    await fetch("/api/push/subscribe", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: subscription.endpoint }),
-    });
-  } catch {
-    // ignore
-  }
-}

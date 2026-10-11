@@ -48,6 +48,13 @@ export async function sendPushToUsers(userIds, payload) {
   }).lean();
   const body = JSON.stringify(payload);
 
+  // Nothing found for this user: say how many devices the database holds
+  // overall, so a missing row can be told apart from a lookup problem.
+  if (!subscriptions.length) {
+    const total = await PushSubscription.countDocuments({});
+    result.note = `looked for user ending ${String(ids[0]).slice(-4)}; database holds ${total} device(s) in total`;
+  }
+
   await Promise.all(
     subscriptions.map(async (sub) => {
       result.attempted += 1;
@@ -63,6 +70,7 @@ export async function sendPushToUsers(userIds, payload) {
         result.delivered += 1;
       } catch (err) {
         if (err.statusCode === 404 || err.statusCode === 410) {
+          console.log(`[push] device removed: push service said ${err.statusCode} (expired or unsubscribed)`);
           await PushSubscription.deleteOne({ _id: sub._id });
           result.removed += 1;
         } else {
@@ -124,6 +132,7 @@ function mergeResults(into, from) {
   into.removed += from.removed;
   into.failed += from.failed;
   into.errors.push(...from.errors);
+  if (from.note && !into.note) into.note = from.note;
 }
 
 // Sends the lead-time push for a reminder: always to its owner, and — only

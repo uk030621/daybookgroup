@@ -87,7 +87,7 @@ Android and desktop Chrome, Edge and Firefox work straight from the browser.
 - **Switching push off** for a reminder also switches the group push off. Un-sharing the reminder stops group pushes too.
 - **Member mute:** on the Family page, any member can switch on **Mute push notifications from this group**. They stay in the group and still see shared reminders. Their own reminders are unaffected.
 - **Email is unchanged:** emails still go to the reminder's owner only.
-- **Several devices:** every device you have switched on gets the notification. Signing out removes that device.
+- **Several devices:** every device you have switched on gets the notification. Signing out does **not** switch notifications off, so reminders still arrive on a signed-out phone. Before handing a device to someone else, tap **Turn off** in the bell menu. A lost or old device can be removed from any other device you are signed in on, under **Your other devices** in the bell menu.
 - **Stale reminders are skipped:** if a reminder's notification time passed more than 3 hours ago (for example, the scheduler was down), the push is skipped rather than arriving late.
 - **Existing reminders:** reminders created before this update count as push-on, but the 3-hour rule means you will not get a flood of old ones.
 - **Dead devices tidy themselves:** if a browser tells the server a subscription is gone, it is deleted automatically.
@@ -98,18 +98,19 @@ Android and desktop Chrome, Edge and Firefox work straight from the browser.
 |---|---|
 | `public/sw.js` | Service worker: shows the notification and opens the app when tapped |
 | `src/lib/push.js` | Sends pushes with `web-push`, builds the message (UK date format) |
-| `src/lib/pushClient.js` | Browser helpers (subscribe, detect iPhone, sign-out clean-up) |
+| `src/lib/pushClient.js` | Browser helpers (subscribe, detect iPhone) |
 | `src/models/PushSubscription.js` | One row per device |
 | `src/app/api/push/public-key` | Hands the public key to the browser |
 | `src/app/api/push/subscribe` | Saves or removes a device |
+| `src/app/api/push/devices` | Lists your devices and removes one (**Your other devices**) |
 | `src/app/api/push/test` | The **Send a test** button |
 | `src/components/PushToggle.js` | The bell and its menu in the top bar |
 | `src/components/SwitchRow.js` | The on/off switch used in forms |
 | `src/app/api/cron/send-reminder-emails/route.js` | Now also sends pushes (same URL, same secret) |
-| `src/models/Reminder.js` | New fields: `pushEnabled`, `pushSentAt`, `pushNotifyGroup` |
+| `src/models/Reminder.js` | New fields: `pushEnabled`, `pushSentAt`, `pushLastAttemptAt`, `pushLastResult`, `pushNotifyGroup` |
 | `src/app/api/reminders/*` | Accept and save the new fields |
 | `src/components/ReminderForm.js` | Push switch and the group switch; email wording changed to "Remind me" |
-| `src/components/Navbar.js` | Bell added; sign-out forgets the device |
+| `src/components/Navbar.js` | Bell added |
 | `next.config.js` | Stops browsers caching `sw.js` |
 | `src/models/Membership.js` | New field: `pushMuted` |
 | `src/app/api/groups/[id]/mute/route.js` | Saves a member's mute setting |
@@ -132,6 +133,34 @@ No change. The response now includes a `push` section, which is useful when you 
 - `push.waiting`: a push was due but no device is registered yet (retried each run for 3 hours)
 - `push.skippedStale`: skipped because the time had passed by more than 3 hours
 - `push.failed`: the push service rejected it. The `errors` list says why
+
+## Diagnosing a missed push
+
+Each reminder now records what the cron job last did with its push. In Atlas (Open MongoDB shell), on this app's database:
+
+```
+db.reminders.find(
+  { title: /part of the title/i },
+  { title: 1, dueDate: 1, remindMinutesBefore: 1, pushEnabled: 1,
+    pushSentAt: 1, pushLastAttemptAt: 1, pushLastResult: 1, reminderEmailSentAt: 1 }
+)
+```
+
+`pushLastResult` will be one of:
+
+| Value | Meaning |
+|---|---|
+| `delivered to push service for N of M device(s)` | The server sent it successfully. If nothing appeared, check the phone: Focus or Do Not Disturb, notification settings, and (iPhone) that you use the Home Screen icon |
+| `waiting: no devices registered for notifications` | No device was registered under your account when the cron job ran. It retries every run for 3 hours |
+| `no live devices: N expired device(s) removed` | Every registered device had expired. Turn notifications off and on again in the bell |
+| `failed: 401 …` or `failed: 403 …` | The VAPID keys don't match, or `VAPID_SUBJECT` is wrong |
+| `failed: 5xx …` | The push service had a problem. It retries on the next run |
+| `skipped: notify time passed Nh ago` | Skipped as stale (more than 3 hours late) |
+| `skipped: push not configured on the server (VAPID keys missing)` | The server had no VAPID keys loaded at that time. Remember Vercel only applies new variables to deployments built after they were added |
+| `error: …` | The send threw an error; the text says what |
+| *(empty)* | The cron job never reached the push step. Check `pushEnabled`, the due date and the lead time |
+
+The same line also appears in the Vercel function logs for the cron route, as `[cron:push] reminder=<id> …`. Only the reminder id is logged, never titles or email addresses. In Vercel: your project, Logs, then search for `cron:push`.
 
 ## Troubleshooting
 
