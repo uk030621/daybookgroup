@@ -107,6 +107,24 @@ export default function ReminderCard({
                 </span>
               )}
 
+              {reminder.isOwner !== false && reminder.sharedWithGroupId && (
+                <span
+                  className="inline-flex items-center gap-1 text-ink-faint dark:text-paper/50"
+                  title={
+                    reminder.sharedWithUserIds?.length
+                      ? "Shared with only the people you chose"
+                      : "Shared with everyone in the group"
+                  }
+                >
+                  <Users className="w-3 h-3" />
+                  {reminder.sharedWithUserIds?.length
+                    ? `${reminder.sharedWithUserIds.length} ${
+                        reminder.sharedWithUserIds.length === 1 ? "person" : "people"
+                      }`
+                    : "Whole group"}
+                </span>
+              )}
+
               {reminder.isOwner === false && (
                 <span
                   className="inline-flex items-center gap-1 text-ink-faint dark:text-paper/50"

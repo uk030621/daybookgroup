@@ -67,6 +67,14 @@ const ReminderSchema = new Schema(
       default: null,
       index: true,
     },
+    // Only meaningful while the reminder is shared with a group. Empty (the
+    // default, and what every reminder saved before this field existed has)
+    // means everyone in the group. When it lists people, only those active
+    // members — plus the owner — can see the reminder.
+    sharedWithUserIds: {
+      type: [String],
+      default: [],
+    },
     recurrence: {
       type: String,
       enum: ["none", "daily", "weekly", "monthly"],
@@ -105,6 +113,17 @@ const ReminderSchema = new Schema(
     pushSentAt: {
       type: Date,
       default: null,
+    },
+    // Diagnostics only: when the cron job last tried to push this reminder,
+    // and what happened (delivered, waiting for a device, failed, skipped…).
+    pushLastAttemptAt: {
+      type: Date,
+      default: null,
+    },
+    pushLastResult: {
+      type: String,
+      default: null,
+      maxlength: 300,
     },
   },
   { timestamps: true },

@@ -63,6 +63,7 @@ export async function GET(request, { params }) {
 
   return NextResponse.json({
     group,
+    me: session.user.id,
     myRole: myMembership.role,
     pushMuted: Boolean(myMembership.pushMuted),
     members,
@@ -142,7 +143,7 @@ export async function DELETE(request, { params }) {
 
   await Reminder.updateMany(
     { sharedWithGroupId: id },
-    { $set: { sharedWithGroupId: null } },
+    { $set: { sharedWithGroupId: null, sharedWithUserIds: [] } },
   );
   await Membership.deleteMany({ groupId: id });
   await Group.findByIdAndDelete(id);

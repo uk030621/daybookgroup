@@ -148,10 +148,15 @@ export async function sendReminderPush(reminder) {
   );
 
   if (reminder.sharedWithGroupId && reminder.pushNotifyGroup) {
+    // When the owner limited the reminder to particular people, only they
+    // are notified; otherwise it's every active member of the group.
+    const chosen = reminder.sharedWithUserIds || [];
     const memberships = await Membership.find({
       groupId: reminder.sharedWithGroupId,
       status: "active",
-      userId: { $nin: [null, reminder.userId] },
+      userId: chosen.length
+        ? { $nin: [null, reminder.userId], $in: chosen }
+        : { $nin: [null, reminder.userId] },
       pushMuted: { $ne: true },
     })
       .select("userId")

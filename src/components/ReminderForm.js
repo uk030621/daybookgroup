@@ -50,6 +50,11 @@ export default function ReminderForm({
   const [pushEnabled, setPushEnabled] = useState(true);
   const [pushNotifyGroup, setPushNotifyGroup] = useState(false);
   const [sharedWithGroupId, setSharedWithGroupId] = useState("");
+  // Within the chosen group: "everyone", or "chosen" for particular people.
+  const [audience, setAudience] = useState("everyone");
+  const [chosenIds, setChosenIds] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [membersState, setMembersState] = useState("idle"); // idle | loading | ready | failed
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const titleRef = useRef(null);
@@ -71,10 +76,41 @@ export default function ReminderForm({
     setPushEnabled(initial?.pushEnabled !== false);
     setPushNotifyGroup(Boolean(initial?.pushNotifyGroup));
     setSharedWithGroupId(initial?.sharedWithGroupId || "");
+    const chosen = initial?.sharedWithUserIds || [];
+    setAudience(chosen.length ? "chosen" : "everyone");
+    setChosenIds(chosen);
     setError("");
     setSubmitting(false);
     setTimeout(() => titleRef.current?.focus(), 30);
   }, [open, initial]);
+
+  // The other people in the selected group, for the "only people I choose"
+  // list. Loaded when a group is picked.
+  useEffect(() => {
+    if (!open || !sharedWithGroupId) {
+      setMembers([]);
+      setMembersState("idle");
+      return;
+    }
+    let cancelled = false;
+    setMembersState("loading");
+    fetch(`/api/groups/${sharedWithGroupId}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
+      .then((data) => {
+        if (cancelled) return;
+        const others = (data.members || [])
+          .filter((m) => m.status === "active" && m.user && m.user.id !== data.me)
+          .map((m) => ({ id: m.user.id, name: m.user.name || m.user.email || "Member" }));
+        setMembers(others);
+        setMembersState("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setMembersState("failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sharedWithGroupId]);
 
   useEffect(() => {
     function onKey(e) {
@@ -90,6 +126,18 @@ export default function ReminderForm({
     e.preventDefault();
     if (!title.trim()) {
       setError("Give it a title first.");
+      return;
+    }
+    // Only people still in the group count as chosen.
+    const memberIds = new Set(members.map((m) => m.id));
+    const chosenNow =
+      sharedWithGroupId && audience === "chosen"
+        ? membersState === "ready"
+          ? chosenIds.filter((id) => memberIds.has(id))
+          : chosenIds // list not loaded yet: the server checks them
+        : [];
+    if (sharedWithGroupId && audience === "chosen" && chosenNow.length === 0) {
+      setError("Choose at least one person, or share with everyone in the group.");
       return;
     }
     setSubmitting(true);
@@ -112,6 +160,7 @@ export default function ReminderForm({
           ? Intl.DateTimeFormat().resolvedOptions().timeZone
           : undefined,
         sharedWithGroupId: sharedWithGroupId || null,
+        sharedWithUserIds: chosenNow,
       });
     } catch (err) {
       setError(err.message || "Something went wrong. Try again.");
@@ -317,7 +366,11 @@ export default function ReminderForm({
               </label>
               <select
                 value={sharedWithGroupId}
-                onChange={(e) => setSharedWithGroupId(e.target.value)}
+                onChange={(e) => {
+                  setSharedWithGroupId(e.target.value);
+                  setAudience("everyone");
+                  setChosenIds([]);
+                }}
                 className="w-full bg-white/70 dark:bg-dusk/70 border border-rule dark:border-dusk-rule rounded-md px-3 py-2.5 text-base sm:text-sm text-ink dark:text-paper outline-none focus:ring-2 focus:ring-amber/40"
               >
                 <option value="">Keep private</option>
@@ -330,6 +383,76 @@ export default function ReminderForm({
             </div>
           )}
 
+          {sharedWithGroupId && (
+            <fieldset className="rounded-md border border-rule dark:border-dusk-rule bg-white/40 dark:bg-dusk/40 p-3 space-y-1">
+              <legend className="px-1 text-xs font-medium text-ink-faint dark:text-paper/50">
+                Who can see it
+              </legend>
+              <label className="flex items-center gap-3 py-2 text-base sm:text-sm text-ink dark:text-paper cursor-pointer">
+                <input
+                  type="radio"
+                  name="audience"
+                  value="everyone"
+                  checked={audience === "everyone"}
+                  onChange={() => setAudience("everyone")}
+                  className="w-5 h-5 sm:w-4 sm:h-4 accent-sage-dark"
+                />
+                Everyone in the group
+              </label>
+              <label className="flex items-center gap-3 py-2 text-base sm:text-sm text-ink dark:text-paper cursor-pointer">
+                <input
+                  type="radio"
+                  name="audience"
+                  value="chosen"
+                  checked={audience === "chosen"}
+                  onChange={() => setAudience("chosen")}
+                  className="w-5 h-5 sm:w-4 sm:h-4 accent-sage-dark"
+                />
+                Only the people I choose
+              </label>
+
+              {audience === "chosen" && (
+                <div className="pl-8 sm:pl-7 pt-1 space-y-0.5">
+                  {membersState === "loading" && (
+                    <p className="text-sm text-ink-faint dark:text-paper/60">
+                      Loading the group…
+                    </p>
+                  )}
+                  {membersState === "failed" && (
+                    <p className="text-sm text-coral-dark dark:text-coral">
+                      Couldn't load the group's members. Close this and try again.
+                    </p>
+                  )}
+                  {membersState === "ready" && members.length === 0 && (
+                    <p className="text-sm text-ink-faint dark:text-paper/60">
+                      No one else has joined this group yet.
+                    </p>
+                  )}
+                  {members.map((m) => (
+                    <label
+                      key={m.id}
+                      className="flex items-center gap-3 py-2 text-base sm:text-sm text-ink dark:text-paper cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={chosenIds.includes(m.id)}
+                        onChange={(e) =>
+                          setChosenIds((prev) =>
+                            e.target.checked
+                              ? [...prev, m.id]
+                              : prev.filter((id) => id !== m.id),
+                          )
+                        }
+                        className="w-5 h-5 sm:w-4 sm:h-4 accent-sage-dark"
+                      />
+                      <span className="truncate">{m.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          )}
+
           {dueDatePart && (
             <div className="rounded-md border border-rule dark:border-dusk-rule bg-white/40 dark:bg-dusk/40 divide-y divide-rule dark:divide-dusk-rule">
               <SwitchRow
@@ -340,8 +463,16 @@ export default function ReminderForm({
               />
               {sharedWithGroupId && pushEnabled && (
                 <SwitchRow
-                  label="Notify group members too"
-                  description="Everyone in the group who has notifications on gets a push"
+                  label={
+                    audience === "chosen"
+                      ? "Notify the people I chose too"
+                      : "Notify group members too"
+                  }
+                  description={
+                    audience === "chosen"
+                      ? "Each of them gets a push if they have notifications on"
+                      : "Everyone in the group who has notifications on gets a push"
+                  }
                   checked={pushNotifyGroup}
                   onChange={setPushNotifyGroup}
                 />

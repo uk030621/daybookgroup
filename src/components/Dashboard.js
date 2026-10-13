@@ -205,6 +205,7 @@ export default function Dashboard({ user }) {
           pushEnabled: reminder.pushEnabled !== false,
           pushNotifyGroup: !!reminder.pushNotifyGroup,
           sharedWithGroupId: reminder.sharedWithGroupId,
+          sharedWithUserIds: reminder.sharedWithUserIds || [],
         }),
       });
       if (createRes.ok) {

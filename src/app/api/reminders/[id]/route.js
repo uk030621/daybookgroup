@@ -3,7 +3,11 @@ import { auth } from "../../../../lib/auth";
 import { connectToDatabase } from "../../../../lib/mongodb";
 import Reminder from "../../../../models/Reminder";
 import Membership from "../../../../models/Membership";
-import { getActiveMembership } from "../../../../lib/permissions";
+import {
+  getActiveMembership,
+  reminderVisibleToMember,
+  sanitiseChosenMembers,
+} from "../../../../lib/permissions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,7 +26,7 @@ async function findVisibleReminder(id, userId) {
       reminder.sharedWithGroupId,
       userId,
     );
-    if (membership) return reminder;
+    if (membership && reminderVisibleToMember(reminder, userId)) return reminder;
   }
 
   return null;
@@ -81,7 +85,7 @@ export async function PUT(request, { params }) {
         existing.sharedWithGroupId,
         session.user.id,
       );
-      canToggle = Boolean(membership);
+      canToggle = Boolean(membership) && reminderVisibleToMember(existing, session.user.id);
     }
     if (!canToggle) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -142,6 +146,33 @@ export async function PUT(request, { params }) {
     }
   }
 
+  // Who, within the group, can see it. Cleared when the reminder is unshared
+  // or moved to a different group (the old choices would name the wrong
+  // people); otherwise replaced only when the request names people.
+  const finalGroupId =
+    update.sharedWithGroupId !== undefined
+      ? update.sharedWithGroupId
+      : existing.sharedWithGroupId;
+  const groupChanged =
+    update.sharedWithGroupId !== undefined &&
+    String(update.sharedWithGroupId || "") !== String(existing.sharedWithGroupId || "");
+  if (!finalGroupId) {
+    update.sharedWithUserIds = [];
+  } else if (body.sharedWithUserIds !== undefined) {
+    const chosen = await sanitiseChosenMembers(
+      Membership,
+      finalGroupId,
+      session.user.id,
+      body.sharedWithUserIds,
+    );
+    if (chosen.error) {
+      return NextResponse.json({ error: chosen.error }, { status: 400 });
+    }
+    update.sharedWithUserIds = chosen.ids;
+  } else if (groupChanged) {
+    update.sharedWithUserIds = [];
+  }
+
   // Group pushes only make sense for a shared reminder: unsharing (or
   // switching push off entirely) also switches them off.
   const willBeShared =
@@ -174,6 +205,8 @@ export async function PUT(request, { params }) {
     update.remindMinutesBefore !== (existing.remindMinutesBefore ?? 60);
   if (dueChanged || leadChanged) {
     update.pushSentAt = null;
+    update.pushLastAttemptAt = null;
+    update.pushLastResult = null;
   }
 
   const reminder = await Reminder.findOneAndUpdate(

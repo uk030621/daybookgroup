@@ -4,7 +4,11 @@ import { connectToDatabase } from "../../../lib/mongodb";
 import Reminder from "../../../models/Reminder";
 import Membership from "../../../models/Membership";
 import User from "../../../models/User";
-import { getActiveMembership } from "../../../lib/permissions";
+import {
+  getActiveMembership,
+  sanitiseChosenMembers,
+  sharedWithMeClause,
+} from "../../../lib/permissions";
 
 // Reminders change on every write, and this route reads the session cookie
 // on every request — never cache it, or newly created/updated reminders can
@@ -41,7 +45,7 @@ export async function GET(request) {
 
   const ownershipOr = [{ userId: session.user.id }];
   if (myGroupIds.length) {
-    ownershipOr.push({ sharedWithGroupId: { $in: myGroupIds } });
+    ownershipOr.push(sharedWithMeClause(myGroupIds, session.user.id));
   }
 
   const filters = [{ $or: ownershipOr }];
@@ -82,6 +86,8 @@ export async function GET(request) {
     const isOwner = r.userId === session.user.id;
     return {
       ...r,
+      // Only the owner is told who a reminder is limited to.
+      sharedWithUserIds: isOwner ? r.sharedWithUserIds || [] : undefined,
       isOwner,
       owner: isOwner
         ? null
@@ -132,6 +138,20 @@ export async function POST(request) {
     sharedWithGroupId = body.sharedWithGroupId;
   }
 
+  let sharedWithUserIds = [];
+  if (sharedWithGroupId) {
+    const chosen = await sanitiseChosenMembers(
+      Membership,
+      sharedWithGroupId,
+      session.user.id,
+      body.sharedWithUserIds,
+    );
+    if (chosen.error) {
+      return NextResponse.json({ error: chosen.error }, { status: 400 });
+    }
+    sharedWithUserIds = chosen.ids;
+  }
+
   const reminder = await Reminder.create({
     userId: session.user.id,
     email: session.user.email || null,
@@ -154,6 +174,7 @@ export async function POST(request) {
     pushNotifyGroup: Boolean(sharedWithGroupId) && !!body.pushNotifyGroup,
     pushSentAt: null,
     sharedWithGroupId,
+    sharedWithUserIds,
   });
 
   return NextResponse.json(
