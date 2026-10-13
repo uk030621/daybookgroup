@@ -250,7 +250,9 @@ export default function FamilyDashboard() {
           Group Setup
         </h1>
         <p className="text-sm text-ink-faint dark:text-paper/50 mt-1">
-          Give your group a name & manage who's in it.
+          {canCreate || isAdmin
+            ? "Give your group a name & manage who's in it."
+            : "The groups you're in, and who else is in them."}
         </p>
       </div>
 
