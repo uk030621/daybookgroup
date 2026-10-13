@@ -39,6 +39,7 @@ export async function GET(request, { params }) {
   return NextResponse.json({
     groupName: group?.name,
     invitedEmail: membership.invitedEmail,
+    signedInAs: session.user.email || null,
     emailMatches,
   });
 }

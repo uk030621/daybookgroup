@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { NotebookPen } from "lucide-react";
 
 export default function AcceptInvite({ token }) {
@@ -70,10 +71,28 @@ export default function AcceptInvite({ token }) {
             </p>
 
             {!preview.emailMatches ? (
-              <p className="text-sm text-coral-dark dark:text-coral">
-                This invite was sent to {preview.invitedEmail}. Sign out and
-                back in with that account to accept it.
-              </p>
+              <div className="space-y-4">
+                <p className="text-sm text-coral-dark dark:text-coral">
+                  This invite was sent to {preview.invitedEmail}
+                  {preview.signedInAs
+                    ? `, but you're signed in as ${preview.signedInAs}`
+                    : ""}
+                  . Sign in with the Google account for that address to accept
+                  it.
+                </p>
+                <button
+                  onClick={() =>
+                    signOut({
+                      callbackUrl: `/login?callbackUrl=${encodeURIComponent(
+                        `/invite/${token}`,
+                      )}`,
+                    })
+                  }
+                  className="w-full border border-rule dark:border-dusk-rule text-ink dark:text-paper font-medium rounded-md py-3 px-4 hover:bg-ink/5 dark:hover:bg-paper/10 transition"
+                >
+                  Sign out and use a different account
+                </button>
+              </div>
             ) : (
               <button
                 onClick={handleAccept}
