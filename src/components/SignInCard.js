@@ -3,7 +3,16 @@
 import { signIn } from "next-auth/react";
 import { NotebookPen } from "lucide-react";
 
-export default function SignInCard({ callbackUrl = "/" }) {
+function errorMessage(code) {
+  if (!code) return "";
+  if (code === "AccessDenied") {
+    return "This account doesn't have access to GroupDaybook. If you think that's a mistake, contact the person who runs it.";
+  }
+  return "Something went wrong signing you in. Please try again.";
+}
+
+export default function SignInCard({ callbackUrl = "/", error }) {
+  const message = errorMessage(error);
   return (
     <div className="w-full max-w-sm animate-fadeUp">
       <div className="flex flex-col items-center text-center mb-8">
@@ -26,6 +35,14 @@ export default function SignInCard({ callbackUrl = "/" }) {
           <GoogleMark />
           Continue with Google
         </button>
+        {message && (
+          <p
+            role="alert"
+            className="text-sm text-center text-coral-dark dark:text-coral mt-4"
+          >
+            {message}
+          </p>
+        )}
         <p className="text-xs text-center text-ink-faint dark:text-paper/50 mt-4">
           Your reminders are private and tied to your Google account.
         </p>

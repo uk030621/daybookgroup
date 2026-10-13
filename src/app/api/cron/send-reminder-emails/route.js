@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "../../../../lib/mongodb";
 import Reminder from "../../../../models/Reminder";
+import User from "../../../../models/User";
 import { sendReminderEmail } from "../../../../lib/email";
 import { pushIsConfigured, sendReminderPush } from "../../../../lib/push";
 
@@ -47,7 +48,13 @@ export async function GET(request) {
     pending.push({ pushEnabled: { $ne: false }, pushSentAt: null });
   }
 
+  // Someone whose access has been revoked gets no emails or pushes, but
+  // their reminders are kept — unblocking them starts things up again.
+  const blockedUsers = await User.find({ blocked: true }).select("_id").lean();
+  const blockedIds = blockedUsers.map((u) => u._id);
+
   const candidates = await Reminder.find({
+    ...(blockedIds.length ? { userId: { $nin: blockedIds } } : {}),
     completed: false,
     dueDate: { $ne: null },
     $or: pending,
@@ -68,6 +75,15 @@ export async function GET(request) {
   let failed = 0;
   const errors = [];
   const push = { sent: 0, waiting: 0, skippedStale: 0, failed: 0 };
+
+  // Records what happened to a reminder's push on the reminder itself (so it
+  // can be read in the database later) and in the Vercel function logs. Only
+  // the reminder id is logged — never titles or addresses.
+  function recordPush(reminder, outcome) {
+    reminder.pushLastAttemptAt = now;
+    reminder.pushLastResult = outcome;
+    console.log(`[cron:push] reminder=${reminder._id} ${outcome}`);
+  }
 
   for (const reminder of candidates) {
     let changed = false;
@@ -93,6 +109,8 @@ export async function GET(request) {
 
       if (now.getTime() - notifyAt > PUSH_STALE_MS) {
         reminder.pushSentAt = now;
+        const hoursLate = Math.round(((now.getTime() - notifyAt) / 3600000) * 10) / 10;
+        recordPush(reminder, `skipped: notify time passed ${hoursLate}h ago`);
         changed = true;
         push.skippedStale += 1;
       } else {
@@ -100,21 +118,42 @@ export async function GET(request) {
           const result = await sendReminderPush(reminder);
           if (result.delivered > 0) {
             reminder.pushSentAt = now;
+            recordPush(
+              reminder,
+              `delivered to push service for ${result.delivered} of ${result.attempted} device(s)`,
+            );
             changed = true;
             push.sent += 1;
           } else if (result.failed > 0) {
             // Left unmarked so the next run tries again.
+            recordPush(reminder, `failed: ${result.errors[0]}`);
+            changed = true;
             push.failed += 1;
             errors.push({
               id: reminder._id.toString(),
               message: `push: ${result.errors[0]}`,
             });
+          } else if (result.attempted > 0) {
+            // Every device the push service knew about had expired.
+            recordPush(
+              reminder,
+              `no live devices: ${result.removed} expired device(s) removed`,
+            );
+            changed = true;
+            push.waiting += 1;
           } else {
             // No registered device yet. Left unmarked, so turning
             // notifications on shortly afterwards still catches it.
+            recordPush(
+              reminder,
+              `waiting: no devices registered for notifications${result.note ? ` (${result.note})` : ""}`,
+            );
+            changed = true;
             push.waiting += 1;
           }
         } catch (err) {
+          recordPush(reminder, `error: ${err.message}`);
+          changed = true;
           push.failed += 1;
           errors.push({
             id: reminder._id.toString(),
@@ -122,6 +161,13 @@ export async function GET(request) {
           });
         }
       }
+    }
+
+    // Push wanted but the server has no VAPID keys loaded: say so on the
+    // reminder, since this is otherwise completely silent.
+    if (!pushReady && reminder.pushEnabled !== false && !reminder.pushSentAt) {
+      recordPush(reminder, "skipped: push not configured on the server (VAPID keys missing)");
+      changed = true;
     }
 
     if (changed) {

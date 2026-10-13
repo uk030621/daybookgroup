@@ -26,6 +26,18 @@ const UserSchema = new Schema(
       type: Date,
       default: Date.now,
     },
+    // Set by the app's owner to revoke someone's access. A blocked person
+    // can't sign in, and any session they already have stops working.
+    // Nothing of theirs is deleted, so unblocking restores everything.
+    blocked: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    blockedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

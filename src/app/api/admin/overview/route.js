@@ -5,6 +5,7 @@ import User from "../../../../models/User";
 import Group from "../../../../models/Group";
 import Membership from "../../../../models/Membership";
 import Reminder from "../../../../models/Reminder";
+import { isPlatformAdmin } from "../../../../lib/permissions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -64,7 +65,10 @@ export async function GET() {
       image: u.image,
       createdAt: u.createdAt,
       lastSignInAt: u.lastSignInAt,
+      blocked: Boolean(u.blocked),
+      isOwner: isPlatformAdmin(u.email),
     })),
+    me: session.user.id,
     groups: groupSummaries,
   });
 }

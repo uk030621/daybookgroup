@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { ShieldAlert } from "lucide-react";
+import ConfirmDialog from "./ConfirmDialog";
+import Toast from "./Toast";
 
 function formatDate(dateString) {
   if (!dateString) return "—";
-  return new Date(dateString).toLocaleDateString("en-US", {
+  return new Date(dateString).toLocaleDateString("en-GB", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -16,6 +18,33 @@ export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pendingBlock, setPendingBlock] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [toast, setToast] = useState("");
+
+  async function setBlocked(user, blocked) {
+    setBusyId(user._id);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/users/${user._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocked }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Couldn't change that person's access.");
+      setData((prev) => ({
+        ...prev,
+        users: prev.users.map((u) => (u._id === user._id ? { ...u, blocked } : u)),
+      }));
+      setToast(blocked ? "Access revoked" : "Access restored");
+      setTimeout(() => setToast(""), 2200);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/admin/overview", { cache: "no-store" })
@@ -133,7 +162,8 @@ export default function AdminDashboard() {
                     <th className="pb-2 pr-3 font-medium">Name</th>
                     <th className="pb-2 pr-3 font-medium">Email</th>
                     <th className="pb-2 pr-3 font-medium">Joined</th>
-                    <th className="pb-2 font-medium">Last sign-in</th>
+                    <th className="pb-2 pr-3 font-medium">Last sign-in</th>
+                    <th className="pb-2 font-medium">Access</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -151,8 +181,31 @@ export default function AdminDashboard() {
                       <td className="py-2 pr-3 text-ink-faint dark:text-paper/60 whitespace-nowrap">
                         {formatDate(u.createdAt)}
                       </td>
-                      <td className="py-2 text-ink-faint dark:text-paper/60 whitespace-nowrap">
+                      <td className="py-2 pr-3 text-ink-faint dark:text-paper/60 whitespace-nowrap">
                         {formatDate(u.lastSignInAt)}
+                      </td>
+                      <td className="py-2 whitespace-nowrap">
+                        {u.isOwner || u._id === data.me ? (
+                          <span className="text-ink-faint dark:text-paper/50">
+                            {u._id === data.me ? "You" : "Owner"}
+                          </span>
+                        ) : u.blocked ? (
+                          <button
+                            onClick={() => setBlocked(u, false)}
+                            disabled={busyId === u._id}
+                            className="text-sage-dark dark:text-sage font-medium px-3 py-2 -my-2 rounded-md hover:bg-sage/10 disabled:opacity-60"
+                          >
+                            Blocked · Restore
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setPendingBlock(u)}
+                            disabled={busyId === u._id}
+                            className="text-coral-dark dark:text-coral px-3 py-2 -my-2 rounded-md hover:bg-coral/10 disabled:opacity-60"
+                          >
+                            Revoke access
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -160,6 +213,24 @@ export default function AdminDashboard() {
               </table>
             </div>
           </div>
+
+          <ConfirmDialog
+            open={Boolean(pendingBlock)}
+            title="Revoke this person's access?"
+            confirmLabel="Revoke access"
+            description={
+              pendingBlock
+                ? `${pendingBlock.name || pendingBlock.email} will be signed out and won't be able to sign in or use GroupDaybook, and will stop getting reminder emails and notifications. Nothing of theirs is deleted, and you can restore access at any time.`
+                : ""
+            }
+            onConfirm={() => {
+              const user = pendingBlock;
+              setPendingBlock(null);
+              setBlocked(user, true);
+            }}
+            onCancel={() => setPendingBlock(null)}
+          />
+          <Toast message={toast} />
         </>
       )}
     </div>

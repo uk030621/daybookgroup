@@ -29,6 +29,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   pages: {
     signIn: "/login",
+    // Sign-in refusals (for example a blocked account) come back to the
+    // login page as ?error=… so it can explain what happened.
+    error: "/login",
   },
   callbacks: {
     async signIn({ account, profile }) {
@@ -40,6 +43,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (account?.provider === "google" && profile?.sub) {
         try {
           await connectToDatabase();
+
+          // A blocked account can't sign in at all.
+          const existing = await User.findById(profile.sub)
+            .select("blocked")
+            .lean();
+          if (existing?.blocked) return false;
+
           await User.findByIdAndUpdate(
             profile.sub,
             {
@@ -74,6 +84,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id ?? token.sub;
         session.user.isPlatformAdmin = isPlatformAdmin(session.user.email);
+
+        // Sessions are long-lived tokens, so blocking someone has to be
+        // checked on every request or they'd stay signed in for weeks. A
+        // blocked person gets a session with no user in it, which every
+        // page and API route already treats as "not signed in".
+        try {
+          await connectToDatabase();
+          const record = await User.findById(session.user.id)
+            .select("blocked")
+            .lean();
+          if (record?.blocked) return { expires: session.expires };
+        } catch (err) {
+          // If the check itself fails, don't lock everyone out over it.
+          console.error("Couldn't check whether a user is blocked:", err);
+        }
       }
       return session;
     },

@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }) {
 
   return (
     <main className="min-h-screen flex items-center justify-center px-6 paper-texture">
-      <SignInCard callbackUrl={callbackUrl} />
+      <SignInCard callbackUrl={callbackUrl} error={params?.error} />
     </main>
   );
 }
