@@ -127,38 +127,38 @@ export default function ReminderCard({
            complete by anyone else, not pinned, edited, or deleted. */}
         {reminder.isOwner !== false && (
           <div
-            className="flex items-center gap-1 mt-3 pl-8 border-t border-rule/60 dark:border-dusk-rule/60 pt-2.5 -mb-1
-              sm:mt-0 sm:pl-0 sm:pt-0 sm:border-t-0 sm:mb-0
+            className="flex items-center justify-evenly mt-3 px-4 pt-1.5 pb-2 border-t border-rule/60 dark:border-dusk-rule/60
+              sm:justify-start sm:gap-1 sm:mt-0 sm:p-0 sm:border-t-0
               sm:absolute sm:top-2 sm:right-2
               sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 sm:transition"
           >
             <button
               onClick={() => onTogglePin(reminder)}
               title={reminder.pinned ? "Unpin" : "Pin to top"}
-              className={`p-1.5 rounded hover:bg-ink/5 dark:hover:bg-paper/10 ${
+              className={`p-3 sm:p-1.5 rounded hover:bg-ink/5 dark:hover:bg-paper/10 ${
                 reminder.pinned
                   ? "text-amber-dark dark:text-amber"
                   : "text-ink-faint dark:text-paper/50"
               }`}
             >
               <Pin
-                className="w-3.5 h-3.5"
+                className="w-4 h-4 sm:w-3.5 sm:h-3.5"
                 fill={reminder.pinned ? "currentColor" : "none"}
               />
             </button>
             <button
               onClick={() => onEdit(reminder)}
               title="Edit"
-              className="p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-ink/5 dark:hover:bg-paper/10 hover:text-ink dark:hover:text-paper"
+              className="p-3 sm:p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-ink/5 dark:hover:bg-paper/10 hover:text-ink dark:hover:text-paper"
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <Pencil className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
             <button
               onClick={() => onDelete(reminder)}
               title="Delete"
-              className="p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-coral/10 hover:text-coral-dark dark:hover:text-coral"
+              className="p-3 sm:p-1.5 rounded text-ink-faint dark:text-paper/50 hover:bg-coral/10 hover:text-coral-dark dark:hover:text-coral"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
           </div>
         )}
