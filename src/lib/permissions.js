@@ -72,3 +72,32 @@ export async function sanitiseChosenMembers(Membership, groupId, ownerId, reques
   }
   return { ids };
 }
+
+// Who may start a new group. Groups are created by the app's owner (the
+// emails in PLATFORM_ADMIN_EMAILS); everyone else is invited into them. If
+// that list hasn't been set at all, creation stays open so the owner can't be
+// locked out of their own app.
+export function canCreateGroups(email) {
+  const configured = (process.env.PLATFORM_ADMIN_EMAILS || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (configured.length === 0) return true;
+  return isPlatformAdmin(email);
+}
+
+// When someone stops being a member of a group (they leave, or an admin
+// removes them), the reminders they had shared with it go back to being
+// private. Nothing is deleted.
+export async function unshareMemberReminders(Reminder, groupId, userId) {
+  return Reminder.updateMany(
+    { userId, sharedWithGroupId: groupId },
+    {
+      $set: {
+        sharedWithGroupId: null,
+        sharedWithUserIds: [],
+        pushNotifyGroup: false,
+      },
+    },
+  );
+}

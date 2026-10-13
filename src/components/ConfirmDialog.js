@@ -1,6 +1,13 @@
 "use client";
 
-export default function ConfirmDialog({ open, title, description, onConfirm, onCancel }) {
+export default function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel = "Delete",
+  onConfirm,
+  onCancel,
+}) {
   if (!open) return null;
 
   return (
@@ -28,7 +35,7 @@ export default function ConfirmDialog({ open, title, description, onConfirm, onC
             onClick={onConfirm}
             className="flex-1 py-2 rounded-md bg-coral text-white text-sm font-medium hover:bg-coral-dark transition"
           >
-            Delete
+            {confirmLabel}
           </button>
         </div>
       </div>

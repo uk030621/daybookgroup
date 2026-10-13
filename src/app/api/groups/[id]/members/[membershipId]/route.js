@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "../../../../../../lib/auth";
 import { connectToDatabase } from "../../../../../../lib/mongodb";
 import Membership from "../../../../../../models/Membership";
+import Reminder from "../../../../../../models/Reminder";
 import {
   getActiveMembership,
   isGroupAdmin,
+  unshareMemberReminders,
 } from "../../../../../../lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +59,10 @@ export async function DELETE(request, { params }) {
   }
 
   await target.deleteOne();
+
+  if (target.status === "active" && target.userId) {
+    await unshareMemberReminders(Reminder, id, target.userId);
+  }
 
   return NextResponse.json({ success: true });
 }

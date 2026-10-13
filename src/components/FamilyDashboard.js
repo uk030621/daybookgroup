@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { UserPlus, Trash2, Shield, Mail, Pencil, Check, X } from "lucide-react";
+import {
+  UserPlus,
+  Trash2,
+  Shield,
+  Mail,
+  Pencil,
+  Check,
+  X,
+  LogOut,
+} from "lucide-react";
 import ConfirmDialog from "./ConfirmDialog";
 import Toast from "./Toast";
 import SwitchRow from "./SwitchRow";
@@ -9,6 +18,9 @@ import SwitchRow from "./SwitchRow";
 export default function FamilyDashboard() {
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
+  // Only the app's owner can start groups; everyone else is invited into them.
+  const [canCreate, setCanCreate] = useState(true);
+  const [pendingLeave, setPendingLeave] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -38,6 +50,7 @@ export default function FamilyDashboard() {
       const res = await fetch("/api/groups", { cache: "no-store" });
       const data = await res.json();
       setGroups(data.groups || []);
+      setCanCreate(data.canCreateGroups !== false);
       if (data.groups?.length && !selectedGroupId) {
         setSelectedGroupId(data.groups[0]._id);
       }
@@ -187,6 +200,23 @@ export default function FamilyDashboard() {
     }
   }
 
+  async function confirmLeave() {
+    setPendingLeave(false);
+    const leftId = selectedGroupId;
+    try {
+      const res = await fetch(`/api/groups/${leftId}/leave`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't leave this group.");
+      const remaining = groups.filter((g) => g._id !== leftId);
+      setGroups(remaining);
+      setDetail(null);
+      setSelectedGroupId(remaining[0]?._id || null);
+      showToast("You've left the group");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleMuteChange(muted) {
     const previous = detail.pushMuted;
     setDetail((prev) => ({ ...prev, pushMuted: muted }));
@@ -207,6 +237,11 @@ export default function FamilyDashboard() {
   }
 
   const isAdmin = detail?.myRole === "admin";
+  // A group's last admin can't leave (they can delete the group instead).
+  const adminCount = (detail?.members || []).filter(
+    (m) => m.status === "active" && m.role === "admin",
+  ).length;
+  const canLeave = Boolean(detail) && (!isAdmin || adminCount > 1);
 
   return (
     <div className="space-y-6">
@@ -244,7 +279,8 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {/* Create-group form: always available */}
+      {/* Create-group form: only for the app's owner */}
+      {canCreate && (
       <form
         onSubmit={handleCreateGroup}
         className="bg-white/60 dark:bg-dusk-card/60 border border-rule dark:border-dusk-rule rounded-card p-4 flex gap-2"
@@ -266,6 +302,7 @@ export default function FamilyDashboard() {
           {creatingGroup ? "Creating…" : "Create"}
         </button>
       </form>
+      )}
 
       {loadingGroups && (
         <p className="text-sm text-ink-faint dark:text-paper/50">Loading…</p>
@@ -273,7 +310,9 @@ export default function FamilyDashboard() {
 
       {!loadingGroups && groups.length === 0 && (
         <p className="text-sm text-ink-faint dark:text-paper/50">
-          You're not part of a selected group yet — create one above.
+          {canCreate
+            ? "You're not part of a selected group yet — create one above."
+            : "You're not in a group yet. Ask a group admin to invite you — the invite arrives by email."}
         </p>
       )}
 
@@ -405,15 +444,26 @@ export default function FamilyDashboard() {
                 </form>
               )}
 
-              {isAdmin && (
-                <div className="pt-3 mt-1 border-t border-rule/60 dark:border-dusk-rule/60">
-                  <button
-                    onClick={() => setPendingGroupDelete(true)}
-                    className="inline-flex items-center gap-1.5 text-sm text-coral-dark dark:text-coral hover:bg-coral/10 rounded-md px-2 py-1.5 -ml-2 transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete this group
-                  </button>
+              {(isAdmin || canLeave) && (
+                <div className="pt-3 mt-1 border-t border-rule/60 dark:border-dusk-rule/60 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {canLeave && (
+                    <button
+                      onClick={() => setPendingLeave(true)}
+                      className="inline-flex items-center gap-1.5 text-sm text-coral-dark dark:text-coral hover:bg-coral/10 rounded-md px-2 py-2 -ml-2 transition"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      Leave this group
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => setPendingGroupDelete(true)}
+                      className="inline-flex items-center gap-1.5 text-sm text-coral-dark dark:text-coral hover:bg-coral/10 rounded-md px-2 py-2 -ml-2 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete this group
+                    </button>
+                  )}
                 </div>
               )}
             </>
@@ -424,6 +474,7 @@ export default function FamilyDashboard() {
       <ConfirmDialog
         open={Boolean(pendingRemoval)}
         title="Remove this person?"
+        confirmLabel="Remove"
         description={
           pendingRemoval
             ? `${pendingRemoval.user?.name || pendingRemoval.invitedEmail} will lose access to this group.`
@@ -431,6 +482,19 @@ export default function FamilyDashboard() {
         }
         onConfirm={confirmRemoval}
         onCancel={() => setPendingRemoval(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingLeave}
+        title="Leave this group?"
+        confirmLabel="Leave group"
+        description={
+          detail
+            ? `You'll stop seeing "${detail.group.name}" and its reminders, and won't get its notifications. Reminders you shared with it become private again. You'd need a new invite to rejoin.`
+            : ""
+        }
+        onConfirm={confirmLeave}
+        onCancel={() => setPendingLeave(false)}
       />
 
       <ConfirmDialog

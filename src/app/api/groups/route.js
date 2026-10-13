@@ -3,6 +3,7 @@ import { auth } from "../../../lib/auth";
 import { connectToDatabase } from "../../../lib/mongodb";
 import Group from "../../../models/Group";
 import Membership from "../../../models/Membership";
+import { canCreateGroups } from "../../../lib/permissions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,7 +35,10 @@ export async function GET() {
     myRole: roleByGroupId.get(group._id.toString()),
   }));
 
-  return NextResponse.json({ groups: result });
+  return NextResponse.json({
+    groups: result,
+    canCreateGroups: canCreateGroups(session.user.email),
+  });
 }
 
 // POST /api/groups — create a new group. Creator automatically becomes its
@@ -43,6 +47,13 @@ export async function POST(request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canCreateGroups(session.user.email)) {
+    return NextResponse.json(
+      { error: "Groups are set up by the app's owner. Ask them to invite you to one." },
+      { status: 403 },
+    );
   }
 
   const body = await request.json();
